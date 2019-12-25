@@ -1,6 +1,5 @@
 /* Demo/DemoController.m
 
-
    Copyright (C) 2018 Free Software Foundation, Inc.
 
    Author: Stjepan Brkic <stjepanbrkicc@gmail.com>
@@ -27,53 +26,101 @@
 
 #import "DemoController.h"
 
+@interface DebugButtonCell : NSButtonCell
+
+@end
+
+@implementation DebugButtonCell
+- (void) _drawBorderAndBackgroundWithFrame: (NSRect)cellFrame
+                                    inView: (NSView*)controlView
+{
+  NSLog(@"kmu");
+  [super _drawBorderAndBackgroundWithFrame: cellFrame inView: controlView];
+}
+@end
+
+
+@interface DebugButton : NSButton
+@end
+
+
+@implementation DebugButton
++ initialize
+{
+  [super initialize];
+  [self setCellClass: [DebugButtonCell class]];
+}
+- (void) drawRect: (NSRect)aRect
+{
+  [super drawRect: aRect];
+  NSLog(@"DebugButton: drawRect");
+}
+@end
+
 @implementation DemoController
+
+@synthesize window=_window;
+@synthesize mainView=_mainView;
+@synthesize renderer=_renderer;
+
 - (void) applicationDidFinishLaunching: (id)t
 {
-  NSView * view = [[NSView alloc] init];
-  NSView * view2 = [[NSView alloc] init];
-  NSView * view3 = [[NSView alloc] init];
-  NSView * view3_5 = [[NSView alloc] init];
-  NSView * view4 = [[NSView alloc] init];
-
-  NSLog(@"%p %p %p %p %p", view, view2, view3, view3_5, view4);
-
-  [view addSubview: view2];
-  [view2 addSubview: view3];
-  [view2 addSubview: view3_5];
-  [view3 addSubview: view4];
-
-  NSLog(@"view wantsLayer value: %d", [view wantsLayer]);
-  NSLog(@"view2 wantsLayer value: %d", [view2 wantsLayer]);
-  NSLog(@"view3 wantsLayer value: %d", [view3 wantsLayer]);
-  NSLog(@"view3_5 wantsLayer value: %d", [view3_5 wantsLayer]);
-  NSLog(@"view4 wantsLayer value: %d", [view4 wantsLayer]);
-
-  NSLog(@"Setting view2 wantsLayer to true");
-  [view2 setWantsLayer: YES];
-  NSLog(@"view wantsLayer value: %d", [view wantsLayer]);
-  NSLog(@"view2 wantsLayer value: %d", [view2 wantsLayer]);
-  NSLog(@"view3 wantsLayer value: %d", [view3 wantsLayer]);
-  NSLog(@"view3_5 wantsLayer value: %d", [view3_5 wantsLayer]);
-  NSLog(@"view4 wantsLayer value: %d", [view4 wantsLayer]);
-
-  CARenderer *renderer = [[CARenderer alloc] init];
-
-  NSLog(@"addCARenderer on root layer %p", view2);
-  NSLog(@"Success: %d", [view2 _gsAddCARenderer: renderer]); // Also creates OpenGL context
-  NSLog(@"addCARenderer on non-root layer %p", view3);
-  NSLog(@"Success: %d", [view3 _gsAddCARenderer: renderer]);
-
-  NSLog(@"removeCARenderer from root layer %p", view2);
-  NSLog(@"Success: %d", [view2 _gsRemoveCARenderer]);
-  NSLog(@"removeCARenderer from non-root layer %p", view3);
-  NSLog(@"Success: %d" ,[view3 _gsRemoveCARenderer]);
-
-  NSWindow *window = [[NSWindow alloc] initWithContentRect: NSMakeRect(0,0,800,600)
+  /* Test the drawing into the context */
+  self->_window = [[NSWindow alloc] initWithContentRect: NSMakeRect(0,0,800,600)
                                         styleMask: NSTitledWindowMask | NSClosableWindowMask
                                           backing: NSBackingStoreBuffered
                                             defer: NO];
-  [window makeKeyAndOrderFront: nil];
+  self->_mainView = [[DebugButton alloc] initWithFrame: [[self->_window contentView] frame]];
+  [self->_mainView setTitle: @"hello"];
+  [self->_window setContentView: self->_mainView];
+  [self->_mainView setWantsLayer: YES];
+  NSLog(@"mainView wantsLayer value: %d", [self->_mainView wantsLayer]);
+  [self->_window makeKeyAndOrderFront: nil];
+  [[self->_mainView _gsLayer] retain];
+
+  /*
+  CGColorRef yellowColor = CGColorCreateGenericRGB(1, 1, 0, 1);
+  [[self->_mainView _gsLayer] setBackgroundColor: yellowColor];
+  */
+
+  /* set up the NSTimer */
+  NSTimer *timer = [NSTimer scheduledTimerWithTimeInterval: 1.0 
+                                                    target: self 
+                                                  selector: @selector(drawRect:) 
+                                                  userInfo: nil
+                                                   repeats: YES];
+
+}
+
+-(void) drawRect: (NSTimer*)t
+{
+  NSLog(@"mainView is at %p", self->_mainView);
+  //[[self->_mainView _gsCreateOpenGLContext] makeCurrentContext];
+  NSLog(@"Context is at %p", [self->_mainView _gsCreateOpenGLContext]);
+  NSLog(@"_gsLayer %p", [self->_mainView _gsLayer]);
+  [[self->_mainView _gsLayer] setNeedsDisplay];
+
+  [[self->_mainView _gsCreateOpenGLContext] makeCurrentContext];
+
+  glClear(GL_COLOR_BUFFER_BIT);
+  glMatrixMode(GL_PROJECTION);
+  glLoadIdentity();
+  glOrtho(0, [self->_mainView frame].size.width, 0, [self->_mainView frame].size.height, -2500, 2500);
+  
+  glMatrixMode(GL_MODELVIEW);
+  glLoadIdentity();
+
+  NSLog(@"renderer: %p : %@", [self->_mainView _gsRendererTemp], [self->_mainView _gsRendererTemp]);
+  [[self->_mainView _gsRendererTemp] addUpdateRect: [[self->_mainView _gsRendererTemp] bounds]];
+  [[self->_mainView _gsRendererTemp] beginFrameAtTime: CACurrentMediaTime()
+                          timeStamp: NULL];
+
+  [[self->_mainView _gsRendererTemp] render];
+  [[self->_mainView _gsRendererTemp] endFrame];
+
+  glFlush();
+  [[self->_mainView _gsCreateOpenGLContext] flushBuffer];
+
 }
 
 -(BOOL)applicationShouldTerminateAfterLastWindowClosed: (id)sender

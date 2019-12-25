@@ -29,10 +29,18 @@
 #import <AppKit/NSOpenGL.h>
 #import <AppKit/NSApplication.h>
 #import <AppKit/NSMenu.h>
+#import <GL/gl.h>
 #import "../Source/GSCAData.h"
 #import "../Source/NSView+CAMethods.h"
 
 @interface DemoController : NSObject
 {
+  NSWindow   *_window;
+  NSView     * _mainView;
+  CARenderer * _renderer;
 }
+
+@property NSWindow *window;
+@property NSView *mainView;
+@property CARenderer *renderer;
 @end
